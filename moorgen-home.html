@@ -120,13 +120,190 @@
 
   /* Sector path animation */
   .sector-arc { transition: stroke-dashoffset 0.4s cubic-bezier(0.4,0,0.2,1); }
+
+  /* ── A: Particle canvas ── */
+  #particle-canvas { position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.5; }
+
+  /* ── A: Ripple on click ── */
+  .ripple-wrap { position:relative; overflow:hidden; }
+  .ripple-effect { position:absolute; border-radius:50%; background:rgba(201,169,110,0.25); transform:scale(0); animation:ripple 0.6s ease-out forwards; pointer-events:none; }
+
+  /* ── A: Gold glow breathe on active cards ── */
+  .glass-card.active { animation: card-glow 3s ease infinite; }
+  @keyframes card-glow {
+    0%,100% { box-shadow: 0 0 0 0 rgba(201,169,110,0); }
+    50%      { box-shadow: 0 0 24px 2px rgba(201,169,110,0.12); }
+  }
+
+  /* ── B: Waveform bars ── */
+  .wave-bar { display:inline-block; width:3px; border-radius:2px; background:linear-gradient(180deg,var(--gold),var(--gold-dim)); transform-origin:bottom; animation:wave-dance var(--dur,0.8s) ease-in-out infinite alternate; }
+  @keyframes wave-dance { from { transform:scaleY(0.15); } to { transform:scaleY(1); } }
+
+  /* ── B: Animated counter ── */
+  .count-up { display:inline-block; transition:all 0.6s cubic-bezier(0.4,0,0.2,1); }
+
+  /* ── C: Page slide transition ── */
+  .page-enter { animation: pageSlideIn 0.35s cubic-bezier(0.4,0,0.2,1) forwards; }
+  @keyframes pageSlideIn {
+    from { opacity:0; transform:translateX(18px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+
+  /* ── C: Card shimmer sweep ── */
+  .glass-card { position:relative; overflow:hidden; }
+  .glass-card::before {
+    content:'';
+    position:absolute;
+    top:0; left:-100%; width:60%; height:100%;
+    background:linear-gradient(90deg, transparent, rgba(201,169,110,0.06), transparent);
+    transform:skewX(-20deg);
+    transition:none;
+    pointer-events:none;
+  }
+  .glass-card:hover::before { left:160%; transition:left 0.7s ease; }
+
+  /* ── C: Scene switch bg flash ── */
+  .scene-flash { animation: sceneFlash 0.5s ease forwards; }
+  @keyframes sceneFlash {
+    0%   { background-color: rgba(201,169,110,0.04); }
+    100% { background-color: transparent; }
+  }
+
+  /* ── Top bar gold line ── */
+  .topbar-line {
+    position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.5) 30%, rgba(232,201,138,0.8) 50%, rgba(201,169,110,0.5) 70%, transparent 100%);
+    background-size:200% 100%;
+    animation:shimmer 4s ease infinite;
+  }
+
+  /* ── Lock screen particles ── */
+  .lock-particle { position:absolute; border-radius:50%; background:rgba(201,169,110,0.6); animation:float-up var(--dur,6s) ease-in infinite; }
+  @keyframes float-up {
+    0%   { transform:translateY(0) scale(1); opacity:0.6; }
+    100% { transform:translateY(-100vh) scale(0.2); opacity:0; }
+  }
 </style>
 </head>
 <body>
 <div id="root"></div>
+<canvas id="particle-canvas"></canvas>
 
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── A: Particle engine ────────────────────────────────────────────────────────
+const initParticles = () => {
+  const canvas = document.getElementById('particle-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], raf;
+  const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
+  resize();
+  window.addEventListener('resize', resize);
+  for (let i = 0; i < 55; i++) particles.push({
+    x: Math.random()*W, y: Math.random()*H,
+    r: Math.random()*1.5+0.3,
+    vx: (Math.random()-0.5)*0.18, vy: (Math.random()-0.5)*0.18,
+    a: Math.random()*0.5+0.1,
+  });
+  const draw = () => {
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x<0) p.x=W; if (p.x>W) p.x=0;
+      if (p.y<0) p.y=H; if (p.y>H) p.y=0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(201,169,110,${p.a})`;
+      ctx.fill();
+    });
+    // draw faint connecting lines
+    for (let i=0;i<particles.length;i++) for (let j=i+1;j<particles.length;j++) {
+      const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist<120) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x,particles[i].y);
+        ctx.lineTo(particles[j].x,particles[j].y);
+        ctx.strokeStyle=`rgba(201,169,110,${0.06*(1-dist/120)})`;
+        ctx.lineWidth=0.5;
+        ctx.stroke();
+      }
+    }
+    raf = requestAnimationFrame(draw);
+  };
+  draw();
+  return () => { cancelAnimationFrame(raf); window.removeEventListener('resize',resize); };
+};
+
+// ── A: Ripple helper ──────────────────────────────────────────────────────────
+const addRipple = (e) => {
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 2;
+  const x = (e.clientX || e.touches?.[0]?.clientX || rect.left+rect.width/2) - rect.left - size/2;
+  const y = (e.clientY || e.touches?.[0]?.clientY || rect.top+rect.height/2) - rect.top - size/2;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple-effect';
+  ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px;`;
+  el.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 700);
+};
+
+// ── B: Animated counter ───────────────────────────────────────────────────────
+const AnimatedNumber = ({ value, duration=600 }) => {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (prev.current === value) return;
+    const start = prev.current, end = value, startTime = performance.now();
+    const tick = (now) => {
+      const t = Math.min((now-startTime)/duration, 1);
+      const ease = t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+      setDisplay(Math.round(start + (end-start)*ease));
+      if (t < 1) requestAnimationFrame(tick);
+      else { setDisplay(end); prev.current = end; }
+    };
+    requestAnimationFrame(tick);
+  }, [value, duration]);
+  return <span className="count-up">{display}</span>;
+};
+
+// ── B: Mini waveform (music visualizer) ──────────────────────────────────────
+const Waveform = ({ playing, bars=12 }) => (
+  <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:18 }}>
+    {Array(bars).fill(0).map((_,i) => (
+      <div key={i} className="wave-bar" style={{
+        height: `${Math.round(30+Math.sin(i*1.3)*50)}%`,
+        '--dur': `${0.5+Math.random()*0.6}s`,
+        animationPlayState: playing ? 'running' : 'paused',
+        opacity: playing ? 1 : 0.3,
+      }}/>
+    ))}
+  </div>
+);
+
+// ── B: Mini sparkline chart ───────────────────────────────────────────────────
+const Sparkline = ({ data, color='#C9A96E', width=80, height=28 }) => {
+  const min = Math.min(...data), max = Math.max(...data);
+  const pts = data.map((v,i) => {
+    const x = (i/(data.length-1))*width;
+    const y = height - ((v-min)/(max-min||1))*(height-4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} style={{ overflow:'visible' }}>
+      <defs>
+        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter:`drop-shadow(0 0 3px ${color}80)` }}/>
+    </svg>
+  );
+};
 
 // ─── ICONS (inline SVG) ───────────────────────────────────────────────────────
 const Icon = ({ name, size=20, color="currentColor", style={} }) => {
@@ -335,8 +512,11 @@ const MusicPlayer = ({ music, onUpdate }) => {
       </div>
       {/* Track info */}
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ color:'var(--text-primary)', fontSize:13, fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{music.track}</div>
-        <div style={{ color:'var(--text-secondary)', fontSize:11, marginTop:2 }}>{music.artist}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+          <div style={{ color:'var(--text-primary)', fontSize:13, fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{music.track}</div>
+          <Waveform playing={music.playing} bars={10}/>
+        </div>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, marginTop:0 }}>{music.artist}</div>
         <div className="progress-bar" style={{ marginTop:6 }} onClick={e => {
           const pct = e.nativeEvent.offsetX / e.currentTarget.offsetWidth * 100;
           onUpdate({ progress: pct });
@@ -377,9 +557,9 @@ const scenes = [
 const SceneSelector = ({ scene, rooms, onSceneChange }) => (
   <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
     {scenes.map((s,i) => (
-      <div key={s.id} className={`scene-card glass-card ${scene===s.id?'active':''}`}
+      <div key={s.id} className={`scene-card glass-card ripple-wrap ${scene===s.id?'active':''}`}
         style={{ padding:'14px 12px', textAlign:'center', animationDelay:`${i*0.05}s` }}
-        onClick={() => onSceneChange(s)}>
+        onClick={(e) => { addRipple(e); onSceneChange(s); }}>
         <div style={{ width:40, height:40, margin:'0 auto 8px', borderRadius:12, background: scene===s.id ? 'linear-gradient(135deg,rgba(201,169,110,0.2),rgba(201,169,110,0.08))' : 'rgba(255,255,255,0.03)', display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${scene===s.id ? 'rgba(201,169,110,0.4)':'rgba(255,255,255,0.05)'}`, transition:'all 0.3s' }}>
           <Icon name={s.icon} size={18} color={scene===s.id ? 'var(--gold)':'var(--text-secondary)'}/>
         </div>
@@ -449,25 +629,29 @@ const SecurityPanel = ({ security, onUpdate }) => {
 };
 
 // ─── OVERVIEW DASHBOARD ───────────────────────────────────────────────────────
-const OverviewDashboard = ({ state, onRoomUpdate, onSceneChange }) => {
+const OverviewDashboard = ({ state, onRoomUpdate, onSceneChange, energyHistory, tempHistory }) => {
   const totalDevices = Object.values(state.rooms).filter(r => r.light > 0 || r.music).length;
+  const stats = [
+    { label:'活跃房间', value: totalDevices, unit:'间', icon:'home', color:'#C9A96E', spark: null },
+    { label:'当前温度', value: state.rooms[state.currentRoom].temp, unit:'°C', icon:'thermometer', color:'#60a5fa', spark: tempHistory },
+    { label:'空气质量', value: state.rooms[state.currentRoom].airQuality, unit:'优', icon:'leaf', color:'#4ade80', spark: null },
+    { label:'能耗节省', value: 34, unit:'%', icon:'zap', color:'#a78bfa', spark: energyHistory },
+  ];
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
       {/* Stats row */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
-        {[
-          { label:'活跃房间', value: totalDevices, unit:'间', icon:'home', color:'#C9A96E' },
-          { label:'当前温度', value: state.rooms[state.currentRoom].temp, unit:'°C', icon:'thermometer', color:'#60a5fa' },
-          { label:'空气质量', value: state.rooms[state.currentRoom].airQuality, unit:'优', icon:'leaf', color:'#4ade80' },
-          { label:'能耗节省', value: 34, unit:'%', icon:'zap', color:'#a78bfa' },
-        ].map((s,i) => (
-          <div key={i} className="glass-card" style={{ padding:'14px 16px' }}>
+        {stats.map((s,i) => (
+          <div key={i} className="glass-card ripple-wrap" style={{ padding:'14px 16px', cursor:'default' }} onClick={addRipple}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
               <div style={{ width:32, height:32, borderRadius:10, background:`rgba(${s.color==='#C9A96E'?'201,169,110':s.color==='#60a5fa'?'96,165,250':s.color==='#4ade80'?'74,222,128':'167,139,250'},0.1)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Icon name={s.icon} size={16} color={s.color}/>
               </div>
+              {s.spark && <Sparkline data={s.spark} color={s.color} width={60} height={22}/>}
             </div>
-            <div style={{ fontSize:22, fontWeight:300, color:'var(--text-primary)' }}>{s.value}<span style={{ fontSize:12, color:'var(--text-secondary)', marginLeft:3 }}>{s.unit}</span></div>
+            <div style={{ fontSize:22, fontWeight:300, color:'var(--text-primary)' }}>
+              <AnimatedNumber value={s.value}/><span style={{ fontSize:12, color:'var(--text-secondary)', marginLeft:3 }}>{s.unit}</span>
+            </div>
             <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:3, letterSpacing:'0.05em' }}>{s.label}</div>
           </div>
         ))}
@@ -630,6 +814,16 @@ const App = () => {
   const [locked, setLocked] = useState(true);
   const [pin, setPin] = useState('');
   const [lockError, setLockError] = useState(false);
+  const [sceneFlash, setSceneFlash] = useState(false);
+  // sparkline history for energy
+  const [energyHistory] = useState(() => Array(12).fill(0).map((_,i)=>20+Math.sin(i*0.8)*12+Math.random()*8));
+  const [tempHistory] = useState(() => Array(12).fill(0).map((_,i)=>22+Math.sin(i*0.5)*2+Math.random()*1));
+
+  // A: init particles
+  useEffect(() => {
+    const cleanup = initParticles();
+    return cleanup;
+  }, []);
 
   // Clock
   useEffect(() => {
@@ -642,6 +836,8 @@ const App = () => {
   }));
 
   const applyScene = (scene) => {
+    setSceneFlash(true);
+    setTimeout(() => setSceneFlash(false), 500);
     setState(s => {
       const newRooms = { ...s.rooms };
       Object.entries(scene.lights).forEach(([id, light]) => {
@@ -671,9 +867,23 @@ const App = () => {
 
   // Lock screen
   if (locked) {
+    const lockParticles = Array(18).fill(0).map((_,i) => ({
+      left: `${Math.random()*100}%`,
+      top: `${80+Math.random()*20}%`,
+      size: Math.random()*3+1,
+      dur: `${4+Math.random()*6}s`,
+      delay: `${Math.random()*4}s`,
+    }));
     return (
-      <div className="lock-overlay" style={{ flexDirection:'column', gap:32 }}>
-        <div style={{ textAlign:'center' }}>
+      <div className="lock-overlay" style={{ flexDirection:'column', gap:32, position:'relative', overflow:'hidden' }}>
+        {/* floating particles */}
+        {lockParticles.map((p,i) => (
+          <div key={i} className="lock-particle" style={{ left:p.left, top:p.top, width:p.size, height:p.size, '--dur':p.dur, animationDelay:p.delay }}/>
+        ))}
+        {/* gold ring */}
+        <div style={{ position:'absolute', width:320, height:320, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.06)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
+        <div style={{ position:'absolute', width:480, height:480, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.03)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
+        <div style={{ textAlign:'center', position:'relative' }}>
           <div style={{ fontSize:72, fontWeight:100, color:'var(--text-primary)', letterSpacing:'0.05em', lineHeight:1 }}>{timeStr}</div>
           <div style={{ color:'var(--text-secondary)', marginTop:8, fontSize:15, fontWeight:300 }}>{dateStr}</div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:16, color:'var(--text-muted)', fontSize:12 }}>
@@ -692,10 +902,11 @@ const App = () => {
         {/* Keypad */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, width:220 }}>
           {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i) => (
-            <button key={i} onClick={() => { if(d==='⌫') setPin(p=>p.slice(0,-1)); else if(d!=='') handlePin(String(d)); }}
+            <button key={i} onClick={(e) => { addRipple(e); if(d==='⌫') setPin(p=>p.slice(0,-1)); else if(d!=='') handlePin(String(d)); }}
+              className="ripple-wrap"
               style={{ height:60, borderRadius:14, background: d==='' ? 'transparent' : 'rgba(255,255,255,0.06)', border: d==='' ? 'none' : '1px solid rgba(255,255,255,0.08)', color:'var(--text-primary)', fontSize: d==='⌫' ? 18 : 24, fontWeight:300, cursor: d==='' ? 'default':'pointer', transition:'all 0.15s', backdropFilter:'blur(10px)' }}
-              onMouseDown={e => e.currentTarget.style.background = d ? 'rgba(201,169,110,0.15)' : 'transparent'}
-              onMouseUp={e => e.currentTarget.style.background = d===''?'transparent':'rgba(255,255,255,0.06)'}
+              onMouseDown={e => { if(d) e.currentTarget.style.background='rgba(201,169,110,0.15)'; }}
+              onMouseUp={e => { e.currentTarget.style.background=d===''?'transparent':'rgba(255,255,255,0.06)'; }}
             >{d}</button>
           ))}
         </div>
@@ -705,9 +916,10 @@ const App = () => {
   }
 
   return (
-    <div style={{ width:'100vw', height:'100vh', display:'flex', flexDirection:'column', background:'var(--bg-primary)', overflow:'hidden' }}>
+    <div style={{ width:'100vw', height:'100vh', display:'flex', flexDirection:'column', background:'var(--bg-primary)', overflow:'hidden' }} className={sceneFlash ? 'scene-flash' : ''}>
       {/* ── TOP BAR ── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 28px', borderBottom:'1px solid var(--border)', flexShrink:0, background:'rgba(8,8,9,0.95)', backdropFilter:'blur(20px)', zIndex:10 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 28px', borderBottom:'1px solid var(--border)', flexShrink:0, background:'rgba(8,8,9,0.95)', backdropFilter:'blur(20px)', zIndex:10, position:'relative' }}>
+        <div className="topbar-line"/>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <div>
             <div className="gold-text" style={{ fontSize:16, fontWeight:500, letterSpacing:'0.15em' }}>MOORGEN</div>
@@ -812,9 +1024,9 @@ const App = () => {
           </div>
 
           {/* Scrollable content */}
-          <div style={{ flex:1, overflow:'auto', padding:'0 28px 20px' }} className="fade-in" key={state.currentTab+state.currentRoom}>
+          <div style={{ flex:1, overflow:'auto', padding:'0 28px 20px' }} className="page-enter" key={state.currentTab+state.currentRoom}>
             {state.currentTab==='overview' && (
-              <OverviewDashboard state={state} onRoomUpdate={updateRoom} onSceneChange={applyScene}/>
+              <OverviewDashboard state={state} onRoomUpdate={updateRoom} onSceneChange={applyScene} energyHistory={energyHistory} tempHistory={tempHistory}/>
             )}
             {state.currentTab==='room' && (
               <RoomDetail roomId={state.currentRoom} room={room} onUpdate={data => updateRoom(state.currentRoom, data)} security={state.security} onSecurityUpdate={sec => setState(s => ({...s, security:{...s.security,...sec}}))}/>
