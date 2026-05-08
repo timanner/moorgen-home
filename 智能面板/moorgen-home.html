@@ -183,11 +183,111 @@
     0%   { transform:translateY(0) scale(1); opacity:0.6; }
     100% { transform:translateY(-100vh) scale(0.2); opacity:0; }
   }
+
+  /* ── HUD grid overlay ── */
+  #hud-grid {
+    position:fixed; inset:0; pointer-events:none; z-index:1;
+    background-image:
+      linear-gradient(rgba(201,169,110,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(201,169,110,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  }
+
+  /* ── Corner bracket decoration ── */
+  .tech-card { position:relative; }
+  .tech-card::after {
+    content:'';
+    position:absolute; inset:-1px; border-radius:inherit; pointer-events:none;
+    background:
+      linear-gradient(to right, rgba(201,169,110,0.5) 8px, transparent 8px) 0 0,
+      linear-gradient(to bottom, rgba(201,169,110,0.5) 8px, transparent 8px) 0 0,
+      linear-gradient(to left, rgba(201,169,110,0.5) 8px, transparent 8px) 100% 0,
+      linear-gradient(to bottom, rgba(201,169,110,0.5) 8px, transparent 8px) 100% 0,
+      linear-gradient(to right, rgba(201,169,110,0.5) 8px, transparent 8px) 0 100%,
+      linear-gradient(to top, rgba(201,169,110,0.5) 8px, transparent 8px) 0 100%,
+      linear-gradient(to left, rgba(201,169,110,0.5) 8px, transparent 8px) 100% 100%,
+      linear-gradient(to top, rgba(201,169,110,0.5) 8px, transparent 8px) 100% 100%;
+    background-repeat: no-repeat;
+    background-size: 12px 1px, 1px 12px, 12px 1px, 1px 12px, 12px 1px, 1px 12px, 12px 1px, 1px 12px;
+    opacity:0; transition:opacity 0.3s;
+  }
+  .tech-card:hover::after { opacity:1; }
+
+  /* ── Radar sweep ── */
+  @keyframes radar-sweep {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .radar-sweep { animation: radar-sweep 3s linear infinite; transform-origin: center; }
+  @keyframes radar-ping {
+    0%   { r: 2; opacity:1; }
+    100% { r: 18; opacity:0; }
+  }
+
+  /* ── Data stream on sidebar ── */
+  @keyframes data-flow {
+    0%   { transform: translateY(-100%); opacity:0; }
+    10%  { opacity:0.6; }
+    90%  { opacity:0.6; }
+    100% { transform: translateY(100vh); opacity:0; }
+  }
+  .data-stream { position:absolute; width:1px; background:linear-gradient(180deg, transparent, rgba(201,169,110,0.4), transparent); animation: data-flow var(--dur,4s) linear infinite; pointer-events:none; }
+
+  /* ── Glitch flicker on numbers ── */
+  @keyframes glitch {
+    0%,95%,100% { clip-path:none; transform:none; }
+    96% { clip-path:inset(20% 0 60% 0); transform:translateX(-2px); }
+    97% { clip-path:inset(60% 0 10% 0); transform:translateX(2px); }
+    98% { clip-path:none; transform:none; }
+  }
+  .glitch-num { animation: glitch 6s ease infinite; display:inline-block; }
+
+  /* ── Hex grid lock screen ── */
+  #lock-hex { position:absolute; inset:0; pointer-events:none; opacity:0.15; }
+
+  /* ── Digital rain canvas ── */
+  #rain-canvas { position:absolute; inset:0; pointer-events:none; opacity:0.18; }
+
+  /* ── Scan beam (horizontal sweep across whole screen) ── */
+  @keyframes hbeam {
+    0%   { top:-2px; opacity:0.7; }
+    100% { top:100%; opacity:0; }
+  }
+  .h-beam {
+    position:fixed; left:0; right:0; height:1px; pointer-events:none; z-index:2;
+    background:linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.15) 20%, rgba(201,169,110,0.4) 50%, rgba(201,169,110,0.15) 80%, transparent 100%);
+    animation: hbeam 8s linear infinite;
+  }
+
+  /* ── Signal bars ── */
+  .sig-bar { display:inline-block; border-radius:1px; background:var(--gold); transition:height 0.4s ease, opacity 0.4s ease; }
+
+  /* ── Status label chip ── */
+  .sys-chip {
+    font-size:9px; letter-spacing:0.15em; padding:2px 7px; border-radius:3px;
+    border:1px solid rgba(201,169,110,0.3); color:var(--gold-dim);
+    text-transform:uppercase; font-family:'Inter',sans-serif;
+  }
+
+  /* ── Neon border pulse on active room tab ── */
+  .room-tab.active {
+    box-shadow: inset 0 0 12px rgba(201,169,110,0.06), 0 0 8px rgba(201,169,110,0.08);
+  }
+
+  /* ── Live indicator dot ── */
+  @keyframes live-blink {
+    0%,100% { opacity:1; } 50% { opacity:0.2; }
+  }
+  .live-dot { width:5px; height:5px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80; animation:live-blink 1.2s ease infinite; display:inline-block; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <canvas id="particle-canvas"></canvas>
+<div id="hud-grid"></div>
+<div class="h-beam"></div>
 
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -218,7 +318,6 @@ const initParticles = () => {
       ctx.fillStyle = `rgba(201,169,110,${p.a})`;
       ctx.fill();
     });
-    // draw faint connecting lines
     for (let i=0;i<particles.length;i++) for (let j=i+1;j<particles.length;j++) {
       const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
       const dist=Math.sqrt(dx*dx+dy*dy);
@@ -235,6 +334,35 @@ const initParticles = () => {
   };
   draw();
   return () => { cancelAnimationFrame(raf); window.removeEventListener('resize',resize); };
+};
+
+// ── Digital rain engine ───────────────────────────────────────────────────────
+const initDigitalRain = (canvasId) => {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return () => {};
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth || 400;
+  const H = canvas.height = canvas.offsetHeight || 600;
+  const cols = Math.floor(W / 16);
+  const drops = Array(cols).fill(0).map(() => Math.random() * -50);
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+  let raf;
+  const draw = () => {
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0, 0, W, H);
+    drops.forEach((y, i) => {
+      const ch = chars[Math.floor(Math.random() * chars.length)];
+      const bright = Math.random() > 0.95;
+      ctx.fillStyle = bright ? '#E8C98A' : `rgba(201,169,110,${0.3 + Math.random()*0.4})`;
+      ctx.font = `${bright ? 'bold ' : ''}13px monospace`;
+      ctx.fillText(ch, i * 16, y * 16);
+      if (y * 16 > H && Math.random() > 0.975) drops[i] = 0;
+      drops[i] += 0.5;
+    });
+    raf = requestAnimationFrame(draw);
+  };
+  draw();
+  return () => cancelAnimationFrame(raf);
 };
 
 // ── A: Ripple helper ──────────────────────────────────────────────────────────
@@ -267,8 +395,67 @@ const AnimatedNumber = ({ value, duration=600 }) => {
     };
     requestAnimationFrame(tick);
   }, [value, duration]);
-  return <span className="count-up">{display}</span>;
+  return <span className="count-up glitch-num">{display}</span>;
 };
+
+// ── Radar component ───────────────────────────────────────────────────────────
+const Radar = ({ size=120, targets=[] }) => {
+  const cx = size/2, cy = size/2, r = size*0.44;
+  const rings = [0.33, 0.66, 1];
+  return (
+    <svg width={size} height={size} style={{ display:'block' }}>
+      <defs>
+        <radialGradient id="radar-bg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(201,169,110,0.06)"/>
+          <stop offset="100%" stopColor="rgba(201,169,110,0)"/>
+        </radialGradient>
+        <radialGradient id="sweep-grad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(201,169,110,0.35)"/>
+          <stop offset="100%" stopColor="rgba(201,169,110,0)"/>
+        </radialGradient>
+      </defs>
+      <circle cx={cx} cy={cy} r={r} fill="url(#radar-bg)" stroke="rgba(201,169,110,0.15)" strokeWidth="1"/>
+      {rings.map((f,i) => <circle key={i} cx={cx} cy={cy} r={r*f} fill="none" stroke="rgba(201,169,110,0.12)" strokeWidth="0.5"/>)}
+      <line x1={cx} y1={cy-r} x2={cx} y2={cy+r} stroke="rgba(201,169,110,0.1)" strokeWidth="0.5"/>
+      <line x1={cx-r} y1={cy} x2={cx+r} y2={cy} stroke="rgba(201,169,110,0.1)" strokeWidth="0.5"/>
+      {/* sweep sector */}
+      <g className="radar-sweep">
+        <path d={`M${cx},${cy} L${cx},${cy-r} A${r},${r} 0 0,1 ${cx+r*Math.sin(Math.PI*0.35)},${cy-r*Math.cos(Math.PI*0.35)} Z`}
+          fill="url(#sweep-grad)" opacity="0.7"/>
+        <line x1={cx} y1={cy} x2={cx} y2={cy-r} stroke="rgba(201,169,110,0.6)" strokeWidth="1.5"/>
+      </g>
+      {/* targets */}
+      {targets.map((t,i) => {
+        const angle = (t.angle * Math.PI) / 180;
+        const tx = cx + t.dist * r * Math.sin(angle);
+        const ty = cy - t.dist * r * Math.cos(angle);
+        return (
+          <g key={i}>
+            <circle cx={tx} cy={ty} r="3" fill={t.alert ? '#f87171' : '#4ade80'} opacity="0.9"/>
+            <circle cx={tx} cy={ty} r="3" fill="none" stroke={t.alert ? '#f87171' : '#4ade80'} strokeWidth="1" opacity="0.5">
+              <animate attributeName="r" values="3;10;3" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r="3" fill="var(--gold)" opacity="0.8"/>
+    </svg>
+  );
+};
+
+// ── Signal bars ───────────────────────────────────────────────────────────────
+const SignalBars = ({ strength=4, max=5 }) => (
+  <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:14 }}>
+    {Array(max).fill(0).map((_,i) => (
+      <div key={i} className="sig-bar" style={{
+        width:3,
+        height: `${40 + i*15}%`,
+        opacity: i < strength ? 1 : 0.15,
+      }}/>
+    ))}
+  </div>
+);
 
 // ── B: Mini waveform (music visualizer) ──────────────────────────────────────
 const Waveform = ({ playing, bars=12 }) => (
@@ -573,21 +760,60 @@ const SceneSelector = ({ scene, rooms, onSceneChange }) => (
 // ─── SECURITY PANEL ───────────────────────────────────────────────────────────
 const SecurityPanel = ({ security, onUpdate }) => {
   const alertCam = security.cameras.find(c => c.alert);
+  const radarTargets = [
+    { angle: 45,  dist: 0.55, alert: false },
+    { angle: 160, dist: 0.75, alert: false },
+    { angle: 290, dist: 0.4,  alert: true  },
+    { angle: 220, dist: 0.85, alert: false },
+  ];
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-      {/* Arm control */}
-      <div className="glass-card" style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-            <div className={`status-dot ${security.armed ? 'online' : 'offline'}`}/>
-            <span style={{ color:'var(--text-primary)', fontSize:14 }}>安防系统</span>
+      {/* Arm control + radar row */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:16, alignItems:'start' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div className="glass-card tech-card" style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                <div className={`status-dot ${security.armed ? 'online' : 'offline'}`}/>
+                <span style={{ color:'var(--text-primary)', fontSize:14 }}>安防系统</span>
+                <span className="sys-chip">{security.armed ? 'ARMED' : 'STANDBY'}</span>
+              </div>
+              <div style={{ color: security.armed ? '#4ade80' : 'var(--text-muted)', fontSize:12 }}>
+                {security.armed ? '已布防 · 守护中' : '未布防'}
+              </div>
+            </div>
+            <div className={`toggle ${security.armed ? 'on' : ''}`} onClick={() => onUpdate({ armed: !security.armed })}/>
           </div>
-          <div style={{ color: security.armed ? '#4ade80' : 'var(--text-muted)', fontSize:12 }}>
-            {security.armed ? '已布防 · 守护中' : '未布防'}
+          {/* system status list */}
+          <div className="glass-card tech-card" style={{ padding:'14px 20px' }}>
+            <div style={{ color:'var(--text-secondary)', fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase', marginBottom:10 }}>系统状态</div>
+            {[
+              { label:'门窗传感器', ok:true },
+              { label:'烟雾探测器', ok:true },
+              { label:'红外感应',   ok:true },
+              { label:'网络连接',   ok:true },
+            ].map(item => (
+              <div key={item.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                <span style={{ color:'var(--text-secondary)', fontSize:12 }}>{item.label}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <div className="live-dot" style={{ background: item.ok ? '#4ade80':'#f87171', boxShadow:`0 0 6px ${item.ok?'#4ade80':'#f87171'}` }}/>
+                  <span style={{ color: item.ok ? '#4ade80':'#f87171', fontSize:10 }}>{item.ok?'正常':'异常'}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <div className={`toggle ${security.armed ? 'on' : ''}`} onClick={() => onUpdate({ armed: !security.armed })}/>
+        {/* Radar */}
+        <div className="glass-card tech-card" style={{ padding:'16px', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+          <div style={{ color:'var(--text-secondary)', fontSize:10, letterSpacing:'0.15em', textTransform:'uppercase' }}>区域扫描</div>
+          <Radar size={130} targets={radarTargets}/>
+          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <div className="live-dot"/>
+            <span style={{ color:'var(--text-muted)', fontSize:10 }}>实时监测</span>
+          </div>
+        </div>
       </div>
+
       {/* Alert */}
       {alertCam && (
         <div style={{ padding:'12px 16px', borderRadius:12, background:'rgba(248,113,113,0.08)', border:'1px solid rgba(248,113,113,0.2)', display:'flex', alignItems:'center', gap:10 }}>
@@ -604,11 +830,19 @@ const SecurityPanel = ({ security, onUpdate }) => {
             {cam.status === 'online' ? (
               <>
                 <div className="scanline"/>
-                {/* Simulated scene dots */}
                 <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <div style={{ opacity:0.15, display:'grid', gridTemplateColumns:'repeat(8,1fr)', gap:4, padding:8 }}>
                     {Array(24).fill(0).map((_,i) => <div key={i} style={{ width:4, height:4, borderRadius:'50%', background:'var(--text-muted)' }}/>)}
                   </div>
+                </div>
+                {/* cam timestamp */}
+                <div style={{ position:'absolute', top:6, right:8, fontSize:9, color:'rgba(201,169,110,0.5)', fontFamily:'monospace', letterSpacing:'0.05em' }}>
+                  {new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+                </div>
+                {/* REC indicator */}
+                <div style={{ position:'absolute', top:6, left:8, display:'flex', alignItems:'center', gap:3 }}>
+                  <div className="live-dot" style={{ width:4, height:4 }}/>
+                  <span style={{ fontSize:8, color:'#f87171', letterSpacing:'0.1em' }}>REC</span>
                 </div>
               </>
             ) : (
@@ -642,7 +876,7 @@ const OverviewDashboard = ({ state, onRoomUpdate, onSceneChange, energyHistory, 
       {/* Stats row */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
         {stats.map((s,i) => (
-          <div key={i} className="glass-card ripple-wrap" style={{ padding:'14px 16px', cursor:'default' }} onClick={addRipple}>
+          <div key={i} className="glass-card tech-card ripple-wrap" style={{ padding:'14px 16px', cursor:'default' }} onClick={addRipple}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
               <div style={{ width:32, height:32, borderRadius:10, background:`rgba(${s.color==='#C9A96E'?'201,169,110':s.color==='#60a5fa'?'96,165,250':s.color==='#4ade80'?'74,222,128':'167,139,250'},0.1)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Icon name={s.icon} size={16} color={s.color}/>
@@ -815,11 +1049,11 @@ const App = () => {
   const [pin, setPin] = useState('');
   const [lockError, setLockError] = useState(false);
   const [sceneFlash, setSceneFlash] = useState(false);
-  // sparkline history for energy
+  const [signalStrength, setSignalStrength] = useState(4);
   const [energyHistory] = useState(() => Array(12).fill(0).map((_,i)=>20+Math.sin(i*0.8)*12+Math.random()*8));
   const [tempHistory] = useState(() => Array(12).fill(0).map((_,i)=>22+Math.sin(i*0.5)*2+Math.random()*1));
 
-  // A: init particles
+  // init particles
   useEffect(() => {
     const cleanup = initParticles();
     return cleanup;
@@ -828,6 +1062,34 @@ const App = () => {
   // Clock
   useEffect(() => {
     const t = setInterval(() => setState(s => ({...s, time: new Date()})), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Live data fluctuation — temp, humidity, airQuality drift slightly
+  useEffect(() => {
+    const t = setInterval(() => {
+      setState(s => {
+        const newRooms = { ...s.rooms };
+        Object.keys(newRooms).forEach(id => {
+          const r = newRooms[id];
+          newRooms[id] = {
+            ...r,
+            temp: Math.max(16, Math.min(30, r.temp + (Math.random()-0.5)*0.4)),
+            humidity: Math.max(30, Math.min(80, r.humidity + (Math.random()-0.5)*1)),
+            airQuality: Math.max(60, Math.min(100, r.airQuality + (Math.random()-0.5)*1.5)),
+          };
+        });
+        return { ...s, rooms: newRooms };
+      });
+    }, 3000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Signal strength fluctuation
+  useEffect(() => {
+    const t = setInterval(() => {
+      setSignalStrength(Math.random() > 0.15 ? 4 + (Math.random()>0.5?1:0) : 3);
+    }, 4000);
     return () => clearInterval(t);
   }, []);
 
@@ -876,21 +1138,28 @@ const App = () => {
     }));
     return (
       <div className="lock-overlay" style={{ flexDirection:'column', gap:32, position:'relative', overflow:'hidden' }}>
+        {/* digital rain */}
+        <canvas id="lock-rain" style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0.12, pointerEvents:'none' }}
+          ref={el => { if(el && !el._init) { el._init=true; el.width=el.offsetWidth||window.innerWidth; el.height=el.offsetHeight||window.innerHeight; initDigitalRain('lock-rain'); } }}/>
         {/* floating particles */}
         {lockParticles.map((p,i) => (
           <div key={i} className="lock-particle" style={{ left:p.left, top:p.top, width:p.size, height:p.size, '--dur':p.dur, animationDelay:p.delay }}/>
         ))}
-        {/* gold ring */}
-        <div style={{ position:'absolute', width:320, height:320, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.06)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
-        <div style={{ position:'absolute', width:480, height:480, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.03)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
+        {/* gold rings */}
+        <div style={{ position:'absolute', width:320, height:320, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.08)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none', animation:'pulse-gold 4s ease infinite' }}/>
+        <div style={{ position:'absolute', width:480, height:480, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.04)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
+        <div style={{ position:'absolute', width:200, height:200, borderRadius:'50%', border:'1px solid rgba(201,169,110,0.12)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', pointerEvents:'none' }}/>
+        {/* brand + time */}
         <div style={{ textAlign:'center', position:'relative' }}>
+          <div style={{ fontSize:11, letterSpacing:'0.4em', color:'var(--gold-dim)', marginBottom:12, textTransform:'uppercase' }}>MOORGEN · SMART LIVING</div>
           <div style={{ fontSize:72, fontWeight:100, color:'var(--text-primary)', letterSpacing:'0.05em', lineHeight:1 }}>{timeStr}</div>
           <div style={{ color:'var(--text-secondary)', marginTop:8, fontSize:15, fontWeight:300 }}>{dateStr}</div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:16, color:'var(--text-muted)', fontSize:12 }}>
-            <Icon name="wifi" size={12}/>
-            <span>家庭网络已连接</span>
+            <SignalBars strength={signalStrength}/>
+            <span style={{ marginLeft:4 }}>家庭网络已连接</span>
             <span style={{ margin:'0 8px', opacity:0.3 }}>|</span>
-            <span style={{ color:'#4ade80' }}>所有系统正常</span>
+            <div className="live-dot"/>
+            <span style={{ color:'#4ade80', marginLeft:4 }}>所有系统正常</span>
           </div>
         </div>
         {/* PIN dots */}
@@ -910,7 +1179,7 @@ const App = () => {
             >{d}</button>
           ))}
         </div>
-        <div style={{ color:'var(--text-muted)', fontSize:11 }}>请输入密码解锁 · 演示密码: 1234</div>
+        <div style={{ color:'var(--text-muted)', fontSize:11, letterSpacing:'0.1em' }}>请输入密码解锁 · 演示密码: 1234</div>
       </div>
     );
   }
@@ -930,12 +1199,22 @@ const App = () => {
             <div style={{ color:'var(--text-primary)', fontSize:22, fontWeight:200, letterSpacing:'0.05em' }}>{timeStr}</div>
             <div style={{ color:'var(--text-muted)', fontSize:11 }}>{dateStr}</div>
           </div>
+          {/* system online chip */}
+          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:4, border:'1px solid rgba(74,222,128,0.2)', background:'rgba(74,222,128,0.05)' }}>
+            <div className="live-dot"/>
+            <span style={{ fontSize:9, color:'#4ade80', letterSpacing:'0.15em', textTransform:'uppercase' }}>ONLINE</span>
+          </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+          {/* Signal */}
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <SignalBars strength={signalStrength}/>
+            <span style={{ color:'var(--text-muted)', fontSize:10 }}>5G</span>
+          </div>
           {/* Weather */}
           <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', borderRadius:20, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>
             <Icon name="sun" size={14} color="var(--gold-dim)"/>
-            <span style={{ color:'var(--text-secondary)', fontSize:13 }}>{state.weather.temp}°C</span>
+            <span style={{ color:'var(--text-secondary)', fontSize:13 }}>{Math.round(state.weather.temp)}°C</span>
             <span style={{ color:'var(--text-muted)', fontSize:11 }}>{state.weather.condition}</span>
           </div>
           {/* Security badge */}
@@ -960,7 +1239,11 @@ const App = () => {
       {/* ── MAIN LAYOUT ── */}
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
         {/* ── LEFT SIDEBAR ── */}
-        <div style={{ width:90, borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 0', gap:6, flexShrink:0, background:'rgba(8,8,9,0.8)' }}>
+        <div style={{ width:90, borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 0', gap:6, flexShrink:0, background:'rgba(8,8,9,0.8)', position:'relative', overflow:'hidden' }}>
+          {/* data stream lines */}
+          {[{left:'20%',dur:'3.5s',delay:'0s',h:60},{left:'60%',dur:'5s',delay:'1.2s',h:80},{left:'80%',dur:'4s',delay:'2.5s',h:50}].map((s,i) => (
+            <div key={i} className="data-stream" style={{ left:s.left, height:`${s.h}px`, '--dur':s.dur, animationDelay:s.delay }}/>
+          ))}
           {/* Overview tab */}
           <div className={`room-tab ${state.currentTab==='overview'?'active':''}`} style={{ width:70, padding:'12px 8px', borderRadius:12, textAlign:'center', background: state.currentTab==='overview' ? 'rgba(201,169,110,0.08)' : 'transparent', marginBottom:8 }}
             onClick={() => setState(s => ({...s, currentTab:'overview'}))}>
@@ -995,6 +1278,11 @@ const App = () => {
               <Icon name="shield" size={18} color={state.currentTab==='security' ? 'var(--gold)' : 'var(--text-muted)'}/>
             </div>
             <div style={{ fontSize:10, color: state.currentTab==='security' ? 'var(--gold)' : 'var(--text-muted)', letterSpacing:'0.05em' }}>安防</div>
+          </div>
+          {/* device count at bottom */}
+          <div style={{ marginTop:'auto', textAlign:'center', paddingBottom:4 }}>
+            <div style={{ fontSize:16, fontWeight:200, color:'var(--gold)' }}>{Object.values(state.rooms).filter(r=>r.light>0).length}</div>
+            <div style={{ fontSize:9, color:'var(--text-muted)', letterSpacing:'0.1em' }}>设备</div>
           </div>
         </div>
 
