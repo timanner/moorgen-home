@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MOORGEN · 摩根智能家居</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Noto+Sans+SC:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #080809;
+    --bg-secondary: #0f0f11;
+    --bg-card: #131315;
+    --bg-card-hover: #1a1a1d;
+    --gold: #C9A96E;
+    --gold-light: #E8C98A;
+    --gold-dim: #8B7248;
+    --text-primary: #F0EBE0;
+    --text-secondary: #8A8580;
+    --text-muted: #4A4640;
+    --border: rgba(201,169,110,0.15);
+    --border-active: rgba(201,169,110,0.5);
+    --glow: rgba(201,169,110,0.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; background: var(--bg-primary); overflow: hidden; }
+  body { font-family: 'Inter', 'Noto Sans SC', sans-serif; }
+  #root { width: 100%; height: 100%; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 2px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 1px; }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse-gold { 0%,100% { box-shadow: 0 0 0 0 rgba(201,169,110,0); } 50% { box-shadow: 0 0 20px 4px rgba(201,169,110,0.15); } }
+  @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+  @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes ripple { 0% { transform: scale(0); opacity: 0.6; } 100% { transform: scale(4); opacity: 0; } }
+  @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes blindsOpen { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0% 0); } }
+
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  .slide-in { animation: slideInLeft 0.3s ease forwards; }
+
+  /* Knob */
+  .knob-container { position: relative; cursor: pointer; user-select: none; }
+  .knob-track { fill: none; stroke: rgba(255,255,255,0.05); stroke-linecap: round; }
+  .knob-fill { fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; }
+  .knob-center { transition: all 0.3s ease; }
+
+  /* Glassmorphism card */
+  .glass-card {
+    background: rgba(20,20,22,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .glass-card:hover { border-color: var(--border-active); background: rgba(25,25,28,0.9); }
+  .glass-card.active { border-color: rgba(201,169,110,0.6); background: rgba(30,28,22,0.9); }
+
+  /* Toggle switch */
+  .toggle { width: 44px; height: 24px; background: rgba(255,255,255,0.08); border-radius: 12px; position: relative; cursor: pointer; transition: background 0.3s; border: 1px solid rgba(255,255,255,0.06); }
+  .toggle.on { background: linear-gradient(135deg, var(--gold-dim), var(--gold)); }
+  .toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* Range slider */
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 3px; border-radius: 2px; outline: none; cursor: pointer; background: rgba(255,255,255,0.08); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--gold); cursor: pointer; box-shadow: 0 0 8px rgba(201,169,110,0.5); }
+
+  /* Room tab */
+  .room-tab { transition: all 0.25s ease; cursor: pointer; }
+  .room-tab:hover .room-icon { opacity: 1; }
+  .room-tab.active .room-icon { color: var(--gold); }
+
+  /* Scene card */
+  .scene-card { cursor: pointer; transition: all 0.3s ease; }
+  .scene-card:hover { transform: translateY(-2px); }
+  .scene-card.active { border-color: rgba(201,169,110,0.7) !important; }
+
+  /* Camera grid */
+  .cam-feed { position: relative; overflow: hidden; background: #0a0a0c; }
+  .cam-feed::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 60%, rgba(201,169,110,0.03)); pointer-events: none; }
+  .scanline { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(201,169,110,0.3), transparent); animation: scan 4s linear infinite; }
+  @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+
+  /* Gold gradient text */
+  .gold-text { background: linear-gradient(135deg, #C9A96E, #E8C98A, #C9A96E); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200%; animation: shimmer 4s ease infinite; }
+
+  /* Music progress */
+  .progress-bar { height: 2px; background: rgba(255,255,255,0.08); border-radius: 1px; cursor: pointer; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); border-radius: 1px; transition: width 0.1s linear; }
+
+  /* Curtain visual */
+  .curtain-vis { height: 60px; position: relative; overflow: hidden; }
+  .curtain-left, .curtain-right { position: absolute; top: 0; height: 100%; background: linear-gradient(180deg, #2a2015 0%, #1a1408 100%); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+  .curtain-left { left: 0; }
+  .curtain-right { right: 0; }
+
+  /* Status dot */
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.online { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-dot.offline { background: var(--text-muted); }
+  .status-dot.alert { background: #f87171; box-shadow: 0 0 6px #f87171; animation: pulse-gold 1.5s ease infinite; }
+
+  /* Notification badge */
+  .badge { background: #f87171; color: white; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+
+  /* Lock screen overlay */
+  .lock-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(40px); }
+
+  /* Sector path animation */
+  .sector-arc { transition: stroke-dashoffset 0.4s cubic-bezier(0.4,0,0.2,1); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ─── ICONS (inline SVG) ───────────────────────────────────────────────────────
+const Icon = ({ name, size=20, color="currentColor", style={} }) => {
+  const icons = {
+    home: <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>,
+    bed: <><path d="M2 20v-8a2 2 0 012-2h16a2 2 0 012 2v8"/><path d="M4 10V6a2 2 0 012-2h12a2 2 0 012 2v4"/><line x1="12" y1="10" x2="12" y2="20"/></>,
+    film: <><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></>,
+    kitchen: <><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2"/><path d="M7 2v20"/><path d="M21 15V2"/><path d="M18 2v6c0 1.1.9 2 2 2h1"/><path d="M21 15a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M21 22v-7"/></>,
+    garden: <><path d="M12 22V12"/><path d="M5 12H2a10 10 0 0020 0h-3"/><path d="M8 6c2-2 4-2 4-2s0 2-2 4-4 2-4 2 0-2 2-4z"/><path d="M16 6c-2-2-4-2-4-2s0 2 2 4 4 2 4 2 0-2-2-4z"/></>,
+    sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+    thermometer: <><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></>,
+    wind: <><path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2"/></>,
+    droplets: <><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0014 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 01-11.91 4.97"/></>,
+    shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+    camera: <><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></>,
+    music: <><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></>,
+    play: <polygon points="5 3 19 12 5 21 5 3"/>,
+    pause: <><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></>,
+    skipForward: <><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></>,
+    skipBack: <><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></>,
+    volume2: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></>,
+    moon: <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>,
+    sunrise: <><path d="M17 18a5 5 0 00-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/><line x1="23" y1="22" x2="1" y2="22"/><polyline points="8 6 12 2 16 6"/></>,
+    coffee: <><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></>,
+    leaf: <path d="M2 22c1.25-1.25 2.5-2.5 3.5-4a14.14 14.14 0 01.64-11.32A3.5 3.5 0 019 5.05C12 3 14.5 3 16 3a2 2 0 012 2c0 1.5 0 4-2.07 7a3.5 3.5 0 01-2.64 1.65 14.14 14.14 0 01-11.32.64C.5 15.5 0 17.25 0 19"/>,
+    logout: <><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></>,
+    chevronRight: <polyline points="9 18 15 12 9 6"/>,
+    bell: <><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></>,
+    wifi: <><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></>,
+    lock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></>,
+    unlock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 019.9-1"/></>,
+    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+    star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
+    zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      {icons[name] || <circle cx="12" cy="12" r="5"/>}
+    </svg>
+  );
+};
+
+// ─── GLOBAL STATE ─────────────────────────────────────────────────────────────
+const initialState = {
+  currentRoom: 'living',
+  currentTab: 'overview',
+  scene: null,
+  rooms: {
+    living:  { name:'客厅', icon:'home',    light: 65, temp: 24, curtain: 40, music: true,  airQuality: 92, humidity: 55 },
+    bedroom: { name:'主卧', icon:'bed',     light: 20, temp: 22, curtain: 85, music: false, airQuality: 88, humidity: 60 },
+    cinema:  { name:'影音室', icon:'film',  light: 10, temp: 23, curtain: 100,music: false, airQuality: 95, humidity: 50 },
+    kitchen: { name:'厨房', icon:'kitchen', light: 80, temp: 26, curtain: 30, music: true,  airQuality: 78, humidity: 65 },
+    garden:  { name:'庭院', icon:'garden',  light: 100,temp: 20, curtain: 0,  music: false, airQuality: 98, humidity: 45 },
+  },
+  music: {
+    playing: true,
+    track: 'Comptine d\'Un Autre Été',
+    artist: 'Yann Tiersen',
+    album: 'Amélie',
+    progress: 38,
+    volume: 72,
+    playlist: [
+      { title: "Comptine d'Un Autre Été", artist: 'Yann Tiersen' },
+      { title: 'Experience', artist: 'Ludovico Einaudi' },
+      { title: 'River Flows In You', artist: 'Yiruma' },
+      { title: 'Nuvole Bianche', artist: 'Ludovico Einaudi' },
+    ]
+  },
+  security: {
+    armed: false,
+    cameras: [
+      { id:1, name:'大门', status:'online', alert:false },
+      { id:2, name:'客厅',  status:'online', alert:false },
+      { id:3, name:'庭院北', status:'online', alert:true },
+      { id:4, name:'车库',  status:'offline',alert:false },
+    ]
+  },
+  notifications: 3,
+  weather: { temp: 22, condition: '晴', humidity: 55, wind: 8 },
+  time: new Date(),
+};
+
+// ─── KNOB COMPONENT ───────────────────────────────────────────────────────────
+const Knob = ({ value, onChange, min=0, max=100, size=100, label, unit='%', color='#C9A96E' }) => {
+  const svgRef = useRef(null);
+  const dragging = useRef(false);
+  const startAngle = -225, endAngle = 45;
+  const range = endAngle - startAngle;
+  const pct = (value - min) / (max - min);
+  const angle = startAngle + pct * range;
+  const r = size * 0.38;
+  const cx = size / 2, cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const arcLength = (range / 360) * circumference;
+  const fillLength = pct * arcLength;
+
+  const polarToXY = (deg, radius) => {
+    const rad = (deg - 90) * Math.PI / 180;
+    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  };
+
+  const thumbPos = polarToXY(angle, r);
+
+  const getAngleFromEvent = (e) => {
+    const rect = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - rect.left - cx * (rect.width / size);
+    const dy = clientY - rect.top - cy * (rect.height / size);
+    let deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    if (deg < 0) deg += 360;
+    return deg;
+  };
+
+  const handleMove = useCallback((e) => {
+    if (!dragging.current) return;
+    e.preventDefault();
+    let deg = getAngleFromEvent(e);
+    let adj = deg - 135;
+    if (adj < 0) adj += 360;
+    if (adj > 270) adj = 270;
+    const newPct = adj / 270;
+    onChange(Math.round(min + newPct * (max - min)));
+  }, [min, max, onChange]);
+
+  const handleStart = (e) => { dragging.current = true; handleMove(e); };
+  const handleEnd = () => { dragging.current = false; };
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [handleMove]);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+      <svg ref={svgRef} width={size} height={size} onMouseDown={handleStart} onTouchStart={handleStart} style={{ cursor:'pointer' }}>
+        {/* Track */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" strokeDasharray={`${arcLength} ${circumference}`} strokeDashoffset={0} transform={`rotate(135 ${cx} ${cy})`} strokeLinecap="round"/>
+        {/* Fill */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={value > 0 ? color : 'transparent'} strokeWidth="4" strokeDasharray={`${fillLength} ${circumference}`} strokeDashoffset={0} transform={`rotate(135 ${cx} ${cy})`} strokeLinecap="round" style={{ filter: value > 0 ? `drop-shadow(0 0 6px ${color}80)` : 'none', transition:'stroke-dasharray 0.3s ease' }}/>
+        {/* Thumb */}
+        {value > 0 && <circle cx={thumbPos.x} cy={thumbPos.y} r={4} fill={color} style={{ filter:`drop-shadow(0 0 4px ${color})` }}/>}
+        {/* Center */}
+        <circle cx={cx} cy={cy} r={r * 0.55} fill="rgba(20,20,22,0.9)" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+        <text x={cx} y={cy - 4} textAnchor="middle" fill="#F0EBE0" fontSize={size * 0.16} fontWeight="300" fontFamily="Inter">{value}</text>
+        <text x={cx} y={cy + size*0.13} textAnchor="middle" fill="#8A8580" fontSize={size * 0.1} fontFamily="Inter">{unit}</text>
+      </svg>
+      {label && <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.08em', textTransform:'uppercase' }}>{label}</div>}
+    </div>
+  );
+};
+
+// ─── CURTAIN COMPONENT ────────────────────────────────────────────────────────
+const CurtainControl = ({ value, onChange }) => {
+  const leftWidth = `${value / 2}%`;
+  const rightWidth = `${value / 2}%`;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <div className="curtain-vis" style={{ borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, #1a1a20 0%, #0d0d10 100%)' }}/>
+        <div className="curtain-left" style={{ width:leftWidth }}/>
+        <div className="curtain-right" style={{ width:rightWidth }}/>
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ width:1, height:'100%', background:'rgba(201,169,110,0.2)' }}/>
+        </div>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <span style={{ color:'var(--text-muted)', fontSize:11, width:24 }}>关</span>
+        <input type="range" min={0} max={100} value={value} onChange={e => onChange(Number(e.target.value))} style={{ flex:1, accentColor:'var(--gold)' }}/>
+        <span style={{ color:'var(--text-muted)', fontSize:11, width:24, textAlign:'right' }}>开</span>
+      </div>
+      <div style={{ textAlign:'center', color:'var(--gold)', fontSize:13 }}>{value}% 开启</div>
+    </div>
+  );
+};
+
+// ─── MUSIC PLAYER ─────────────────────────────────────────────────────────────
+const MusicPlayer = ({ music, onUpdate }) => {
+  useEffect(() => {
+    if (!music.playing) return;
+    const timer = setInterval(() => {
+      onUpdate({ progress: (music.progress + 0.1) % 100 });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [music.playing, music.progress]);
+
+  const albumColors = ['#1a1410','#101418','#141018'];
+  const colIdx = music.track.length % 3;
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:16, padding:'12px 20px', background:'rgba(10,10,12,0.95)', borderTop:'1px solid var(--border)', backdropFilter:'blur(20px)' }}>
+      {/* Album art */}
+      <div style={{ width:44, height:44, borderRadius:8, background:`linear-gradient(135deg, ${albumColors[colIdx]}, #1a1410)`, border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(circle at 30% 30%, rgba(201,169,110,0.15), transparent)' }}/>
+        <Icon name="music" size={18} color="var(--gold-dim)"/>
+        {music.playing && <div style={{ position:'absolute', inset:0, borderRadius:8, border:'1px solid rgba(201,169,110,0.3)', animation:'pulse-gold 2s ease infinite' }}/>}
+      </div>
+      {/* Track info */}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ color:'var(--text-primary)', fontSize:13, fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{music.track}</div>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, marginTop:2 }}>{music.artist}</div>
+        <div className="progress-bar" style={{ marginTop:6 }} onClick={e => {
+          const pct = e.nativeEvent.offsetX / e.currentTarget.offsetWidth * 100;
+          onUpdate({ progress: pct });
+        }}>
+          <div className="progress-fill" style={{ width:`${music.progress}%` }}/>
+        </div>
+      </div>
+      {/* Controls */}
+      <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+        <button onClick={() => onUpdate({ track:'River Flows In You', artist:'Yiruma', progress:0 })} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)', padding:4, display:'flex' }}>
+          <Icon name="skipBack" size={16}/>
+        </button>
+        <button onClick={() => onUpdate({ playing: !music.playing })} style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg, var(--gold-dim), var(--gold))', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 16px rgba(201,169,110,0.3)' }}>
+          <Icon name={music.playing ? 'pause' : 'play'} size={14} color="#0a0a0b"/>
+        </button>
+        <button onClick={() => onUpdate({ track:"Experience", artist:'Ludovico Einaudi', progress:0 })} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)', padding:4, display:'flex' }}>
+          <Icon name="skipForward" size={16}/>
+        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8 }}>
+          <Icon name="volume2" size={14} color="var(--text-muted)"/>
+          <input type="range" min={0} max={100} value={music.volume} onChange={e => onUpdate({ volume:Number(e.target.value) })} style={{ width:70 }}/>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── SCENE SELECTOR ───────────────────────────────────────────────────────────
+const scenes = [
+  { id:'arrive',  name:'回家',   icon:'home',    desc:'欢迎回家',   temp:24, lights:{living:80,bedroom:40,cinema:0,kitchen:60,garden:70} },
+  { id:'leave',   name:'离家',   icon:'logout',  desc:'安全离家',   temp:26, lights:{living:0,bedroom:0,cinema:0,kitchen:0,garden:30} },
+  { id:'cinema',  name:'影院',   icon:'film',    desc:'沉浸观影',   temp:22, lights:{living:15,bedroom:0,cinema:5,kitchen:0,garden:0} },
+  { id:'dinner',  name:'晚餐',   icon:'coffee',  desc:'浪漫晚宴',   temp:23, lights:{living:50,bedroom:0,cinema:0,kitchen:100,garden:40} },
+  { id:'sleep',   name:'深睡',   icon:'moon',    desc:'静谧安眠',   temp:20, lights:{living:0,bedroom:5,cinema:0,kitchen:0,garden:0} },
+  { id:'morning', name:'晨起',   icon:'sunrise', desc:'活力清晨',   temp:24, lights:{living:100,bedroom:80,cinema:0,kitchen:80,garden:100} },
+];
+
+const SceneSelector = ({ scene, rooms, onSceneChange }) => (
+  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+    {scenes.map((s,i) => (
+      <div key={s.id} className={`scene-card glass-card ${scene===s.id?'active':''}`}
+        style={{ padding:'14px 12px', textAlign:'center', animationDelay:`${i*0.05}s` }}
+        onClick={() => onSceneChange(s)}>
+        <div style={{ width:40, height:40, margin:'0 auto 8px', borderRadius:12, background: scene===s.id ? 'linear-gradient(135deg,rgba(201,169,110,0.2),rgba(201,169,110,0.08))' : 'rgba(255,255,255,0.03)', display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${scene===s.id ? 'rgba(201,169,110,0.4)':'rgba(255,255,255,0.05)'}`, transition:'all 0.3s' }}>
+          <Icon name={s.icon} size={18} color={scene===s.id ? 'var(--gold)':'var(--text-secondary)'}/>
+        </div>
+        <div style={{ fontSize:13, color: scene===s.id ? 'var(--gold)' : 'var(--text-primary)', fontWeight:400 }}>{s.name}</div>
+        <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:3 }}>{s.desc}</div>
+      </div>
+    ))}
+  </div>
+);
+
+// ─── SECURITY PANEL ───────────────────────────────────────────────────────────
+const SecurityPanel = ({ security, onUpdate }) => {
+  const alertCam = security.cameras.find(c => c.alert);
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      {/* Arm control */}
+      <div className="glass-card" style={{ padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+            <div className={`status-dot ${security.armed ? 'online' : 'offline'}`}/>
+            <span style={{ color:'var(--text-primary)', fontSize:14 }}>安防系统</span>
+          </div>
+          <div style={{ color: security.armed ? '#4ade80' : 'var(--text-muted)', fontSize:12 }}>
+            {security.armed ? '已布防 · 守护中' : '未布防'}
+          </div>
+        </div>
+        <div className={`toggle ${security.armed ? 'on' : ''}`} onClick={() => onUpdate({ armed: !security.armed })}/>
+      </div>
+      {/* Alert */}
+      {alertCam && (
+        <div style={{ padding:'12px 16px', borderRadius:12, background:'rgba(248,113,113,0.08)', border:'1px solid rgba(248,113,113,0.2)', display:'flex', alignItems:'center', gap:10 }}>
+          <div className="status-dot alert"/>
+          <span style={{ color:'#fca5a5', fontSize:13 }}>检测到移动：{alertCam.name}</span>
+          <button onClick={() => onUpdate({ cameras: security.cameras.map(c => c.id===alertCam.id ? {...c,alert:false} : c) })} style={{ marginLeft:'auto', background:'rgba(248,113,113,0.2)', border:'1px solid rgba(248,113,113,0.3)', color:'#fca5a5', fontSize:11, padding:'4px 10px', borderRadius:6, cursor:'pointer' }}>确认</button>
+        </div>
+      )}
+      {/* Camera grid */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        {security.cameras.map(cam => (
+          <div key={cam.id} className="cam-feed" style={{ borderRadius:12, border:`1px solid ${cam.alert ? 'rgba(248,113,113,0.4)' : 'var(--border)'}`, aspectRatio:'16/9', overflow:'hidden' }}>
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, #080810 0%, #0c0c14 100%)' }}/>
+            {cam.status === 'online' ? (
+              <>
+                <div className="scanline"/>
+                {/* Simulated scene dots */}
+                <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <div style={{ opacity:0.15, display:'grid', gridTemplateColumns:'repeat(8,1fr)', gap:4, padding:8 }}>
+                    {Array(24).fill(0).map((_,i) => <div key={i} style={{ width:4, height:4, borderRadius:'50%', background:'var(--text-muted)' }}/>)}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:6 }}>
+                <Icon name="camera" size={20} color="var(--text-muted)"/>
+                <span style={{ color:'var(--text-muted)', fontSize:10 }}>离线</span>
+              </div>
+            )}
+            <div style={{ position:'absolute', bottom:6, left:8, display:'flex', alignItems:'center', gap:4 }}>
+              <div className={`status-dot ${cam.status==='online' ? (cam.alert ? 'alert':'online') : 'offline'}`}/>
+              <span style={{ color:'rgba(240,235,224,0.7)', fontSize:10, fontWeight:300 }}>{cam.name}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── OVERVIEW DASHBOARD ───────────────────────────────────────────────────────
+const OverviewDashboard = ({ state, onRoomUpdate, onSceneChange }) => {
+  const totalDevices = Object.values(state.rooms).filter(r => r.light > 0 || r.music).length;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      {/* Stats row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+        {[
+          { label:'活跃房间', value: totalDevices, unit:'间', icon:'home', color:'#C9A96E' },
+          { label:'当前温度', value: state.rooms[state.currentRoom].temp, unit:'°C', icon:'thermometer', color:'#60a5fa' },
+          { label:'空气质量', value: state.rooms[state.currentRoom].airQuality, unit:'优', icon:'leaf', color:'#4ade80' },
+          { label:'能耗节省', value: 34, unit:'%', icon:'zap', color:'#a78bfa' },
+        ].map((s,i) => (
+          <div key={i} className="glass-card" style={{ padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+              <div style={{ width:32, height:32, borderRadius:10, background:`rgba(${s.color==='#C9A96E'?'201,169,110':s.color==='#60a5fa'?'96,165,250':s.color==='#4ade80'?'74,222,128':'167,139,250'},0.1)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Icon name={s.icon} size={16} color={s.color}/>
+              </div>
+            </div>
+            <div style={{ fontSize:22, fontWeight:300, color:'var(--text-primary)' }}>{s.value}<span style={{ fontSize:12, color:'var(--text-secondary)', marginLeft:3 }}>{s.unit}</span></div>
+            <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:3, letterSpacing:'0.05em' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Scene + rooms */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1.5fr', gap:16 }}>
+        <div>
+          <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:10 }}>场景模式</div>
+          <SceneSelector scene={state.scene} rooms={state.rooms} onSceneChange={onSceneChange}/>
+        </div>
+        <div>
+          <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:10 }}>各空间概览</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {Object.entries(state.rooms).map(([id, room]) => (
+              <div key={id} className="glass-card" style={{ padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:'rgba(201,169,110,0.08)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Icon name={room.icon} size={15} color="var(--gold-dim)"/>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <span style={{ color:'var(--text-primary)', fontSize:13 }}>{room.name}</span>
+                    <span style={{ color:'var(--text-secondary)', fontSize:12 }}>{room.temp}°C</span>
+                  </div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <div style={{ flex:1, height:2, background:'rgba(255,255,255,0.05)', borderRadius:1, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${room.light}%`, background:`linear-gradient(90deg, var(--gold-dim), var(--gold))`, transition:'width 0.5s ease' }}/>
+                    </div>
+                    <span style={{ color:'var(--text-muted)', fontSize:10, width:28, textAlign:'right' }}>{room.light}%</span>
+                  </div>
+                </div>
+                {room.music && <Icon name="music" size={12} color="var(--gold-dim)"/>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── ROOM DETAIL ──────────────────────────────────────────────────────────────
+const RoomDetail = ({ roomId, room, onUpdate, security, onSecurityUpdate }) => {
+  const extraFeatures = {
+    cinema: (
+      <div className="glass-card" style={{ padding:'16px 20px' }}>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:12 }}>影音控制</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          {[['投影仪','on'],['音响','on'],['机顶盒','off'],['HDMI 1','active']].map(([name,st]) => (
+            <div key={name} className="glass-card" style={{ padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ color:'var(--text-primary)', fontSize:13 }}>{name}</span>
+              <span style={{ color: st==='on'||st==='active' ? 'var(--gold)' : 'var(--text-muted)', fontSize:11, background: st==='on'||st==='active' ? 'rgba(201,169,110,0.1)' : 'rgba(255,255,255,0.03)', padding:'2px 8px', borderRadius:4 }}>{st==='active'?'已连接':st==='on'?'开启':'关闭'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    garden: (
+      <div className="glass-card" style={{ padding:'16px 20px' }}>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:12 }}>庭院系统</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+          {[['喷淋',true,'droplets'],['景观灯',true,'sun'],['门禁',false,'shield']].map(([name,on,icon]) => (
+            <div key={name} className="glass-card" style={{ padding:'12px', textAlign:'center' }}>
+              <div style={{ width:36, height:36, margin:'0 auto 8px', borderRadius:10, background: on ? 'rgba(201,169,110,0.12)' : 'rgba(255,255,255,0.03)', display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${on?'rgba(201,169,110,0.3)':'transparent'}` }}>
+                <Icon name={icon} size={16} color={on ? 'var(--gold)' : 'var(--text-muted)'}/>
+              </div>
+              <div style={{ fontSize:12, color: on ? 'var(--text-primary)' : 'var(--text-muted)' }}>{name}</div>
+              <div style={{ fontSize:10, color: on ? 'var(--gold)':'var(--text-muted)', marginTop:2 }}>{on?'运行中':'已停止'}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    kitchen: (
+      <div className="glass-card" style={{ padding:'16px 20px' }}>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:12 }}>厨房设备</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {[['抽油烟机','低速运行','on'],['洗碗机','定时 22:00','schedule'],['净化器','PM2.5: 12','on']].map(([name,info,st]) => (
+            <div key={name} className="glass-card" style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:12 }}>
+              <div className={`status-dot ${st==='on'?'online':'offline'}`}/>
+              <div style={{ flex:1 }}>
+                <div style={{ color:'var(--text-primary)', fontSize:13 }}>{name}</div>
+                <div style={{ color:'var(--text-muted)', fontSize:11 }}>{info}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      {/* Main controls */}
+      <div className="glass-card" style={{ padding:'20px 24px' }}>
+        <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:20 }}>灯光 · 温度</div>
+        <div style={{ display:'flex', justifyContent:'space-evenly', alignItems:'flex-start' }}>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+            <Knob value={room.light} onChange={v => onUpdate({light:v})} label="亮度" unit="%" size={110}/>
+            <div style={{ display:'flex', gap:8 }}>
+              {[0,25,50,75,100].map(v => (
+                <button key={v} onClick={() => onUpdate({light:v})} style={{ padding:'3px 8px', borderRadius:4, background: Math.abs(room.light-v)<5 ? 'rgba(201,169,110,0.2)' : 'rgba(255,255,255,0.04)', border:`1px solid ${Math.abs(room.light-v)<5?'rgba(201,169,110,0.4)':'rgba(255,255,255,0.06)'}`, color: Math.abs(room.light-v)<5?'var(--gold)':'var(--text-muted)', fontSize:11, cursor:'pointer' }}>{v}%</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ width:1, height:120, background:'rgba(255,255,255,0.04)', alignSelf:'center' }}/>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+            <Knob value={room.temp} onChange={v => onUpdate({temp:v})} min={16} max={30} label="温度" unit="°C" size={110} color="#60a5fa"/>
+            <div style={{ display:'flex', gap:10, color:'var(--text-muted)', fontSize:12 }}>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:18, color:'var(--text-primary)', fontWeight:300 }}>{room.humidity}%</div>
+                <div>湿度</div>
+              </div>
+              <div style={{ width:1, background:'rgba(255,255,255,0.04)' }}/>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:18, color:'var(--text-primary)', fontWeight:300 }}>{room.airQuality}</div>
+                <div>空气</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Curtain */}
+      <div className="glass-card" style={{ padding:'16px 20px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <div style={{ color:'var(--text-secondary)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase' }}>窗帘控制</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => onUpdate({curtain:0})} style={{ padding:'3px 10px', borderRadius:5, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text-muted)', fontSize:11, cursor:'pointer' }}>全关</button>
+            <button onClick={() => onUpdate({curtain:50})} style={{ padding:'3px 10px', borderRadius:5, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text-muted)', fontSize:11, cursor:'pointer' }}>半开</button>
+            <button onClick={() => onUpdate({curtain:100})} style={{ padding:'3px 10px', borderRadius:5, background:'rgba(201,169,110,0.1)', border:'1px solid rgba(201,169,110,0.3)', color:'var(--gold)', fontSize:11, cursor:'pointer' }}>全开</button>
+          </div>
+        </div>
+        <CurtainControl value={room.curtain} onChange={v => onUpdate({curtain:v})}/>
+      </div>
+
+      {/* Music */}
+      {roomId !== 'garden' && (
+        <div className="glass-card" style={{ padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <Icon name="music" size={18} color={room.music ? 'var(--gold)' : 'var(--text-muted)'}/>
+            <div>
+              <div style={{ color:'var(--text-primary)', fontSize:13 }}>室内音乐</div>
+              <div style={{ color:'var(--text-muted)', fontSize:11 }}>{room.music ? '播放中 · 同步主音源' : '已静音'}</div>
+            </div>
+          </div>
+          <div className={`toggle ${room.music?'on':''}`} onClick={() => onUpdate({music:!room.music})}/>
+        </div>
+      )}
+
+      {/* Extra features per room */}
+      {extraFeatures[roomId]}
+    </div>
+  );
+};
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+const App = () => {
+  const [state, setState] = useState(initialState);
+  const [locked, setLocked] = useState(true);
+  const [pin, setPin] = useState('');
+  const [lockError, setLockError] = useState(false);
+
+  // Clock
+  useEffect(() => {
+    const t = setInterval(() => setState(s => ({...s, time: new Date()})), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const updateRoom = (roomId, data) => setState(s => ({
+    ...s, rooms: { ...s.rooms, [roomId]: { ...s.rooms[roomId], ...data } }
+  }));
+
+  const applyScene = (scene) => {
+    setState(s => {
+      const newRooms = { ...s.rooms };
+      Object.entries(scene.lights).forEach(([id, light]) => {
+        newRooms[id] = { ...newRooms[id], light, temp: scene.temp };
+      });
+      return { ...s, scene: scene.id, rooms: newRooms };
+    });
+  };
+
+  const handlePin = (digit) => {
+    const newPin = pin + digit;
+    setPin(newPin);
+    if (newPin.length === 4) {
+      if (newPin === '1234') {
+        setLocked(false);
+        setPin('');
+      } else {
+        setLockError(true);
+        setTimeout(() => { setPin(''); setLockError(false); }, 600);
+      }
+    }
+  };
+
+  const room = state.rooms[state.currentRoom];
+  const timeStr = state.time.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' });
+  const dateStr = state.time.toLocaleDateString('zh-CN', { month:'long', day:'numeric', weekday:'short' });
+
+  // Lock screen
+  if (locked) {
+    return (
+      <div className="lock-overlay" style={{ flexDirection:'column', gap:32 }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:72, fontWeight:100, color:'var(--text-primary)', letterSpacing:'0.05em', lineHeight:1 }}>{timeStr}</div>
+          <div style={{ color:'var(--text-secondary)', marginTop:8, fontSize:15, fontWeight:300 }}>{dateStr}</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:16, color:'var(--text-muted)', fontSize:12 }}>
+            <Icon name="wifi" size={12}/>
+            <span>家庭网络已连接</span>
+            <span style={{ margin:'0 8px', opacity:0.3 }}>|</span>
+            <span style={{ color:'#4ade80' }}>所有系统正常</span>
+          </div>
+        </div>
+        {/* PIN dots */}
+        <div style={{ display:'flex', gap:16, justifyContent:'center' }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ width:12, height:12, borderRadius:'50%', background: pin.length > i ? (lockError ? '#f87171' : 'var(--gold)') : 'rgba(255,255,255,0.15)', transition:'all 0.2s', boxShadow: pin.length > i && !lockError ? '0 0 10px rgba(201,169,110,0.6)' : 'none' }}/>
+          ))}
+        </div>
+        {/* Keypad */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, width:220 }}>
+          {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i) => (
+            <button key={i} onClick={() => { if(d==='⌫') setPin(p=>p.slice(0,-1)); else if(d!=='') handlePin(String(d)); }}
+              style={{ height:60, borderRadius:14, background: d==='' ? 'transparent' : 'rgba(255,255,255,0.06)', border: d==='' ? 'none' : '1px solid rgba(255,255,255,0.08)', color:'var(--text-primary)', fontSize: d==='⌫' ? 18 : 24, fontWeight:300, cursor: d==='' ? 'default':'pointer', transition:'all 0.15s', backdropFilter:'blur(10px)' }}
+              onMouseDown={e => e.currentTarget.style.background = d ? 'rgba(201,169,110,0.15)' : 'transparent'}
+              onMouseUp={e => e.currentTarget.style.background = d===''?'transparent':'rgba(255,255,255,0.06)'}
+            >{d}</button>
+          ))}
+        </div>
+        <div style={{ color:'var(--text-muted)', fontSize:11 }}>请输入密码解锁 · 演示密码: 1234</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width:'100vw', height:'100vh', display:'flex', flexDirection:'column', background:'var(--bg-primary)', overflow:'hidden' }}>
+      {/* ── TOP BAR ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 28px', borderBottom:'1px solid var(--border)', flexShrink:0, background:'rgba(8,8,9,0.95)', backdropFilter:'blur(20px)', zIndex:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+          <div>
+            <div className="gold-text" style={{ fontSize:16, fontWeight:500, letterSpacing:'0.15em' }}>MOORGEN</div>
+            <div style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.2em', marginTop:1 }}>SMART LIVING</div>
+          </div>
+          <div style={{ width:1, height:28, background:'var(--border)' }}/>
+          <div>
+            <div style={{ color:'var(--text-primary)', fontSize:22, fontWeight:200, letterSpacing:'0.05em' }}>{timeStr}</div>
+            <div style={{ color:'var(--text-muted)', fontSize:11 }}>{dateStr}</div>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+          {/* Weather */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', borderRadius:20, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>
+            <Icon name="sun" size={14} color="var(--gold-dim)"/>
+            <span style={{ color:'var(--text-secondary)', fontSize:13 }}>{state.weather.temp}°C</span>
+            <span style={{ color:'var(--text-muted)', fontSize:11 }}>{state.weather.condition}</span>
+          </div>
+          {/* Security badge */}
+          <div style={{ position:'relative', cursor:'pointer' }} onClick={() => setState(s => ({...s, currentRoom:s.currentRoom, currentTab:'security'}))}>
+            <div style={{ padding:'6px 14px', borderRadius:20, background: state.security.cameras.some(c=>c.alert) ? 'rgba(248,113,113,0.1)' : 'rgba(255,255,255,0.03)', border:`1px solid ${state.security.cameras.some(c=>c.alert)?'rgba(248,113,113,0.3)':'var(--border)'}`, display:'flex', alignItems:'center', gap:6 }}>
+              <Icon name="shield" size={14} color={state.security.cameras.some(c=>c.alert) ? '#f87171' : state.security.armed ? 'var(--gold)' : 'var(--text-muted)'}/>
+              <span style={{ fontSize:12, color: state.security.cameras.some(c=>c.alert) ? '#f87171' : state.security.armed ? 'var(--gold)' : 'var(--text-muted)' }}>{state.security.cameras.some(c=>c.alert) ? '警报' : state.security.armed ? '布防' : '未防'}</span>
+            </div>
+          </div>
+          {/* Notifications */}
+          <div style={{ position:'relative', cursor:'pointer' }} onClick={() => setState(s => ({...s, notifications:0}))}>
+            <Icon name="bell" size={20} color={state.notifications > 0 ? 'var(--gold)' : 'var(--text-muted)'}/>
+            {state.notifications > 0 && <div className="badge" style={{ position:'absolute', top:-4, right:-6 }}>{state.notifications}</div>}
+          </div>
+          {/* Lock */}
+          <div style={{ cursor:'pointer', padding:4 }} onClick={() => setLocked(true)}>
+            <Icon name="lock" size={18} color="var(--text-muted)"/>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MAIN LAYOUT ── */}
+      <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+        {/* ── LEFT SIDEBAR ── */}
+        <div style={{ width:90, borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 0', gap:6, flexShrink:0, background:'rgba(8,8,9,0.8)' }}>
+          {/* Overview tab */}
+          <div className={`room-tab ${state.currentTab==='overview'?'active':''}`} style={{ width:70, padding:'12px 8px', borderRadius:12, textAlign:'center', background: state.currentTab==='overview' ? 'rgba(201,169,110,0.08)' : 'transparent', marginBottom:8 }}
+            onClick={() => setState(s => ({...s, currentTab:'overview'}))}>
+            <div className="room-icon" style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
+              <Icon name="star" size={18} color={state.currentTab==='overview' ? 'var(--gold)' : 'var(--text-muted)'}/>
+            </div>
+            <div style={{ fontSize:10, color: state.currentTab==='overview' ? 'var(--gold)' : 'var(--text-muted)', letterSpacing:'0.05em' }}>总览</div>
+          </div>
+          <div style={{ width:40, height:1, background:'var(--border)', margin:'4px 0' }}/>
+          {/* Room tabs */}
+          {Object.entries(state.rooms).map(([id, room]) => {
+            const isActive = state.currentTab==='room' && state.currentRoom===id;
+            return (
+              <div key={id} className={`room-tab ${isActive?'active':''}`}
+                style={{ width:70, padding:'10px 8px', borderRadius:12, textAlign:'center', background: isActive ? 'rgba(201,169,110,0.08)' : 'transparent', position:'relative' }}
+                onClick={() => setState(s => ({...s, currentRoom:id, currentTab:'room'}))}>
+                {room.light > 0 && <div style={{ position:'absolute', top:8, right:10, width:5, height:5, borderRadius:'50%', background:'var(--gold)', opacity:0.7 }}/>}
+                <div className="room-icon" style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
+                  <Icon name={room.icon} size={18} color={isActive ? 'var(--gold)' : 'var(--text-muted)'}/>
+                </div>
+                <div style={{ fontSize:10, color: isActive ? 'var(--gold)' : 'var(--text-muted)', letterSpacing:'0.05em', lineHeight:1.3 }}>{room.name}</div>
+              </div>
+            );
+          })}
+          <div style={{ width:40, height:1, background:'var(--border)', margin:'4px 0' }}/>
+          {/* Security tab */}
+          <div className={`room-tab ${state.currentTab==='security'?'active':''}`}
+            style={{ width:70, padding:'10px 8px', borderRadius:12, textAlign:'center', background: state.currentTab==='security' ? 'rgba(201,169,110,0.08)' : 'transparent', position:'relative' }}
+            onClick={() => setState(s => ({...s, currentTab:'security'}))}>
+            {state.security.cameras.some(c=>c.alert) && <div style={{ position:'absolute', top:8, right:10, width:5, height:5, borderRadius:'50%', background:'#f87171', boxShadow:'0 0 6px #f87171' }}/>}
+            <div className="room-icon" style={{ display:'flex', justifyContent:'center', marginBottom:4 }}>
+              <Icon name="shield" size={18} color={state.currentTab==='security' ? 'var(--gold)' : 'var(--text-muted)'}/>
+            </div>
+            <div style={{ fontSize:10, color: state.currentTab==='security' ? 'var(--gold)' : 'var(--text-muted)', letterSpacing:'0.05em' }}>安防</div>
+          </div>
+        </div>
+
+        {/* ── CONTENT AREA ── */}
+        <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          {/* Content header */}
+          <div style={{ padding:'20px 28px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+            <div>
+              <div style={{ fontSize:22, fontWeight:300, color:'var(--text-primary)', letterSpacing:'0.02em' }}>
+                {state.currentTab==='overview' ? '智能家居总览' : state.currentTab==='security' ? '安防监控' : room.name}
+              </div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:3 }}>
+                {state.currentTab==='overview' ? `${Object.values(state.rooms).filter(r=>r.light>0).length} 个空间亮灯 · ${state.scene ? scenes.find(s=>s.id===state.scene)?.name + ' 模式' : '自定义模式'}` :
+                 state.currentTab==='security' ? `${state.security.cameras.filter(c=>c.status==='online').length} 路在线 · ${state.security.armed?'已布防':'未布防'}` :
+                 `${room.light > 0 ? '灯光开启' : '灯光关闭'} · ${room.temp}°C · 窗帘 ${room.curtain}%`}
+              </div>
+            </div>
+            {state.currentTab==='room' && (
+              <div style={{ display:'flex', gap:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)' }}>
+                  <span style={{ color:'var(--text-muted)', fontSize:12 }}>全部设备</span>
+                  <div className={`toggle ${Object.values(state.rooms).some(r=>r.light>0)?'on':''}`} style={{ width:36, height:20 }}
+                    onClick={() => Object.keys(state.rooms).forEach(id => updateRoom(id, {light: Object.values(state.rooms).some(r=>r.light>0)?0:70}))}/>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Scrollable content */}
+          <div style={{ flex:1, overflow:'auto', padding:'0 28px 20px' }} className="fade-in" key={state.currentTab+state.currentRoom}>
+            {state.currentTab==='overview' && (
+              <OverviewDashboard state={state} onRoomUpdate={updateRoom} onSceneChange={applyScene}/>
+            )}
+            {state.currentTab==='room' && (
+              <RoomDetail roomId={state.currentRoom} room={room} onUpdate={data => updateRoom(state.currentRoom, data)} security={state.security} onSecurityUpdate={sec => setState(s => ({...s, security:{...s.security,...sec}}))}/>
+            )}
+            {state.currentTab==='security' && (
+              <SecurityPanel security={state.security} onUpdate={sec => setState(s => ({...s, security:{...s.security,...sec}}))}/>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── BOTTOM MUSIC BAR ── */}
+      <MusicPlayer music={state.music} onUpdate={data => setState(s => ({...s, music:{...s.music,...data}}))}/>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
